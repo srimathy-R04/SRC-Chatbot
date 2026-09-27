@@ -260,9 +260,9 @@ It is **not intended to replace general-purpose AI assistants** and does not pro
 
 | Name   | Register Number |
 | ------ | --------------- |
-| Name 1 | Reg. No.        |
-| Name 2 | Reg. No.        |
-| Name 3 | Reg. No.        |
+| Srinidhi M  | 228003150    |
+| Srimathy R  | 228003147   |
+| Thejashri M | 228003159  |
 
 ---
 
