@@ -1,6 +1,6 @@
+
 from pathlib import Path
 import re
-
 
 # ==================================================
 # KNOWLEDGE BASE LOCATION
@@ -15,17 +15,12 @@ KNOWLEDGE_BASE_DIR = BASE_DIR / "knowledge_base"
 # ==================================================
 
 STOP_WORDS = {
-    "what", "is", "the", "a", "an",
-    "of", "at", "in", "on", "for",
-    "to", "and", "or", "are",
-    "was", "were", "when",
-    "where", "who", "how",
-    "which", "can", "could",
-    "do", "does", "did",
-    "tell", "me", "please",
-    "about", "give", "show",
-    "i", "my", "your", "you",
-    "there", "available"
+    "what", "is", "the", "a", "an", "of", "at", "in",
+    "on", "for", "to", "and", "or", "are", "was", "were",
+    "when", "where", "who", "how", "which", "can", "could",
+    "do", "does", "did", "tell", "me", "please", "about",
+    "give", "show", "i", "my", "your", "you", "there",
+    "available", "begin", "start"
 }
 
 
@@ -35,6 +30,10 @@ STOP_WORDS = {
 
 def load_documents():
     documents = []
+
+    if not KNOWLEDGE_BASE_DIR.exists():
+        print(f"Knowledge base folder not found: {KNOWLEDGE_BASE_DIR}")
+        return documents
 
     for file_path in KNOWLEDGE_BASE_DIR.glob("*.txt"):
         with open(file_path, "r", encoding="utf-8") as file:
@@ -58,82 +57,133 @@ def tokenize(text):
 
 
 # ==================================================
-# SPLIT DOCUMENT
+# SPLIT DOCUMENT INTO CHUNKS
 # ==================================================
 
 def split_into_chunks(text):
-    # First split the document into paragraphs
     sections = re.split(r"\n\s*\n", text)
+    return [
+        section.strip()
+        for section in sections
+        if section.strip()
+    ]
 
-    chunks = []
-    current_chunk = ""
-
-    for section in sections:
-        section = section.strip()
-
-        if not section:
-            continue
-
-        # If the section looks like a heading,
-        # keep the next section together with it.
-        if len(section.splitlines()) <= 2 and len(section) < 100:
-            current_chunk = section
-        else:
-            if current_chunk:
-                chunks.append(current_chunk + "\n\n" + section)
-                current_chunk = ""
-            else:
-                chunks.append(section)
-
-    # Add anything remaining
-    if current_chunk:
-        chunks.append(current_chunk)
-
-    return chunks
 
 
 # ==================================================
-# SEARCH
+# INTENT-BASED SOURCE PRIORITY
+# ==================================================
+
+def get_source_bonus(query, source):
+    query_words = set(tokenize(query))
+    query_lower = query.lower()
+    source = source.lower()
+
+    bonus = 0
+
+    # Contact questions
+    contact_words = {
+        "phone", "number", "email", "contact",
+        "address", "website", "telephone"
+    }
+
+    if query_words & contact_words:
+        if source == "contacts.txt":
+            bonus += 40
+
+    # Programme/course questions
+    programme_words = {
+        "programme", "programmes", "program",
+        "programs", "course", "courses", "degree"
+    }
+
+    if query_words & programme_words:
+        if source == "programmes.txt":
+            bonus += 40
+
+    # Fee questions
+    fee_words = {"fee", "fees", "tuition", "cost", "payment"}
+
+    if query_words & fee_words:
+        if source == "fees.txt":
+            bonus += 40
+
+    # Academic calendar and examination questions
+    calendar_words = {
+        "academic", "calendar", "year", "semester",
+        "exam", "examination", "cia", "date", "dates",
+        "schedule", "timetable", "term"
+    }
+
+    if query_words & calendar_words:
+        if "calendar" in source:
+            bonus += 40
+
+    # Admission questions
+    admission_words = {"admission", "admissions", "application"}
+
+    if query_words & admission_words:
+        if "admission" in source or "contact" in source:
+            bonus += 20
+
+    # SRC background questions
+    about_words = {"history", "founded", "inaugurated", "museum"}
+
+    if query_words & about_words:
+        if source == "about_src.txt":
+            bonus += 30
+
+    return bonus
+
+
+# ==================================================
+# SEARCH KNOWLEDGE BASE
 # ==================================================
 
 def search_knowledge(query, top_k=3):
     query_words = tokenize(query)
+    query_lower = query.lower()
     results = []
+
     documents = load_documents()
+
+    if not documents:
+        return results
 
     for document in documents:
         chunks = split_into_chunks(document["text"])
 
         for chunk in chunks:
             chunk_words = tokenize(chunk)
+            chunk_lower = chunk.lower()
+
+            # Basic word matching
             score = 0
 
-            # WORD MATCH
             for word in query_words:
                 if word in chunk_words:
                     score += 5
 
-            # EXACT PHRASE MATCH
-            query_lower = query.lower()
-            chunk_lower = chunk.lower()
-
-            if query_lower in chunk_lower:
+            # Exact phrase matching
+            if query_lower.strip() in chunk_lower:
                 score += 20
 
-            # SPECIAL KEYWORD MATCHING
-            important_keywords = [
+            # Extra points for important matching terms
+            important_keywords = {
                 "phone", "number", "email", "fee", "fees",
-                "programme", "programmes", "course", "courses",
-                "cia", "exam", "admission", "address",
-                "contact", "website"
-            ]
+                "programme", "programmes", "program", "course",
+                "courses", "cia", "exam", "examination",
+                "admission", "address", "contact", "website",
+                "calendar", "semester", "academic", "year"
+            }
 
             for keyword in important_keywords:
-                if keyword in query_lower:
-                    if keyword in chunk_lower:
-                        score += 15
+                if keyword in query_lower and keyword in chunk_lower:
+                    score += 10
 
-            # ONLY KEEP RELEVANT RESULTS
+            # Prioritize the appropriate knowledge-base file
+            score += get_source_bonus(query, document["source"])
+
             if score > 0:
                 results.append({
                     "source": document["source"],
@@ -142,13 +192,13 @@ def search_knowledge(query, top_k=3):
                 })
 
     # Highest score first
-    results.sort(key=lambda x: x["score"], reverse=True)
+    results.sort(key=lambda item: item["score"], reverse=True)
 
     return results[:top_k]
 
 
 # ==================================================
-# GET CONTEXT
+# GET CONTEXT FOR THE CHATBOT
 # ==================================================
 
 def get_context(query, top_k=3):
@@ -176,16 +226,28 @@ if __name__ == "__main__":
     print("SRC SmartBot - Knowledge Base Test")
     print("-----------------------------------")
 
-    question = input("Enter your question: ")
-    results = search_knowledge(question)
+    while True:
+        question = input("\nEnter your question (or type exit): ").strip()
 
-    if results:
-        print("\nRelevant information found:\n")
+        if question.lower() == "exit":
+            print("Testing completed.")
+            break
 
-        for result in results:
-            print(f"[Score: {result['score']}] Source: {result['source']}")
-            print(result["text"])
-            print("\n---")
+        if not question:
+            print("Please enter a question.")
+            continue
 
-    else:
-        print("\nNo relevant information found.")
+        results = search_knowledge(question)
+
+        if results:
+            print("\nRelevant information found:\n")
+
+            for result in results:
+                print(
+                    f"[Score: {result['score']}] "
+                    f"Source: {result['source']}"
+                )
+                print(result["text"])
+                print("\n---")
+        else:
+            print("\nNo relevant information found.")
