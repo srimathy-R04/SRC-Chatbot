@@ -9,7 +9,21 @@
 </head>
 <body>
 
-<div class="app">
+<!-- ============ LANDING ============ -->
+<section class="landing" id="landing">
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <div class="land-inner">
+    <div class="land-logo"><span class="ring"></span><span class="ring r2"></span>
+      <div class="logo big"><svg class="ico" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="4"/><path d="M12 8V5M9 14h.01M15 14h.01"/><circle cx="12" cy="3.8" r="1"/></svg></div>
+    </div>
+    <h1>SRC SmartBot</h1>
+    <p class="land-tag">Your Smart Campus Assistant</p>
+    <p class="land-sub">Srinivasa Ramanujan Centre<br>SASTRA Deemed University, Kumbakonam</p>
+    <button class="enter" id="enterBtn" type="button">Open SmartBot <svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </div>
+</section>
+
+<div class="app" id="app" hidden>
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar" id="sidebar" aria-label="Main navigation">
@@ -27,6 +41,11 @@
       <svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       New Chat
     </button>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" type="button" role="tab" data-tab="menu">Menu</button>
+      <button class="tab" type="button" role="tab" data-tab="history">History</button>
+    </div>
 
     <nav class="nav" id="nav">
       <button class="nav-item active" type="button" data-section="home">
@@ -58,7 +77,16 @@
       </button>
     </nav>
 
+    <div class="history" id="historyPanel" hidden>
+      <div class="hist-list" id="historyList"></div>
+      <p class="hist-empty" id="historyEmpty">No chats yet. Start a new chat and it will appear here.</p>
+    </div>
+
     <div class="sidebar-foot">
+      <button class="user-chip" id="userChip" type="button">
+        <span class="av" id="userAvatar">G</span>
+        <span class="who"><b id="userName">Guest</b><small id="userSub">Log in to save your name</small></span>
+      </button>
       <button class="nav-item" type="button" id="settingsBtn" data-section="settings">
         <svg class="ico" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Settings
       </button>
@@ -127,12 +155,32 @@
 <div class="modal" id="settingsModal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <h3 id="settingsTitle">Settings</h3>
+    <div class="account">
+      <div><b id="accountName">Guest</b><span id="accountSub">Not logged in</span></div>
+      <button class="btn primary" id="loginOpenBtn" type="button">Log in</button>
+      <button class="btn ghost" id="logoutBtn" type="button" hidden>Log out</button>
+    </div>
     <label for="backendUrl">Backend chat URL</label>
     <input type="url" id="backendUrl" placeholder="http://127.0.0.1:5000/chat">
     <div class="modal-actions">
       <button type="button" class="btn ghost" id="clearChatBtn">Clear conversation</button>
       <button type="button" class="btn ghost" id="resetUrlBtn">Reset URL</button>
       <button type="button" class="btn primary" id="saveSettingsBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LOGIN ============ -->
+<div class="modal" id="loginModal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <h3 id="loginTitle">Log in</h3>
+    <p class="modal-sub">Your name and chat history are saved on this device.</p>
+    <div class="field"><label for="loginName">Name</label><input id="loginName" type="text" maxlength="40" placeholder="Your name"></div>
+    <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" placeholder="you@example.com"></div>
+    <p class="form-err" id="loginError" role="alert"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="loginCancel" type="button">Cancel</button>
+      <button class="btn primary" id="loginSubmit" type="button">Log in</button>
     </div>
   </div>
 </div>

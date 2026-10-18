@@ -12,6 +12,13 @@
     clearChat: $('clearChatBtn'), chatArea: $('chatArea'), welcome: $('welcome'),
     messages: $('messages'), typing: $('typing'), form: $('chatForm'), input: $('userInput'),
     send: $('sendBtn'), lang: $('languageSelect'), status: $('status'), statusText: $('statusText'),
+    landing: $('landing'), app: $('app'), enter: $('enterBtn'), historyPanel: $('historyPanel'),
+    historyList: $('historyList'), historyEmpty: $('historyEmpty'), userChip: $('userChip'),
+    userName: $('userName'), userSub: $('userSub'), userAvatar: $('userAvatar'),
+    accountName: $('accountName'), accountSub: $('accountSub'), loginOpenBtn: $('loginOpenBtn'),
+    logoutBtn: $('logoutBtn'), loginModal: $('loginModal'), loginName: $('loginName'),
+    loginEmail: $('loginEmail'), loginSubmit: $('loginSubmit'), loginCancel: $('loginCancel'),
+    loginError: $('loginError'),
   };
 
   let backendUrl = DEFAULT_URL;
@@ -19,6 +26,23 @@
 
   let busy = false;
   let controller = null;
+
+  // Frontend-only account + history (saved in this browser's localStorage)
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem('src_user')); } catch (_) {}
+  const storeKey = () => 'src_chats_' + (user ? (user.email || user.name).toLowerCase() : 'guest');
+  const loadChats = () => { try { return JSON.parse(localStorage.getItem(storeKey())) || []; } catch (_) { return []; } };
+  let chats = loadChats();
+  let current = null;
+  const saveChats = () => { try { localStorage.setItem(storeKey(), JSON.stringify(chats.slice(0, 50))); } catch (_) {} };
+
+  function record(role, content) {
+    if (!current) { current = { id: Date.now().toString(36), title: 'New chat', messages: [] }; chats.unshift(current); }
+    current.messages.push({ role, content });
+    if (role === 'user' && current.title === 'New chat') current.title = content.slice(0, 42);
+    saveChats();
+    renderHistory();
+  }
 
   /* ---------- Helpers ---------- */
   const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -58,6 +82,7 @@
   const BOT_ICON = '<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="4"/><path d="M12 8V5M9 14h.01M15 14h.01"/></svg>';
 
   function addMessage(role, content, opts = {}) {
+    if (!opts.error && !opts.restore) record(role, content);
     el.welcome.hidden = true;
     const row = document.createElement('div');
     row.className = `msg ${role}${opts.error ? ' error' : ''}`;
@@ -157,6 +182,8 @@
   function newChat() {
     if (controller) controller.abort();
     busy = false;
+    current = null;
+    renderHistory();
     el.messages.innerHTML = '';
     el.welcome.hidden = false;
     showTyping(false);
@@ -211,6 +238,106 @@
     }
   });
 
+  /* ---------- Landing ---------- */
+  el.enter.addEventListener('click', () => {
+    el.landing.classList.add('leave');
+    el.app.hidden = false;
+    setTimeout(() => { el.landing.hidden = true; el.input.focus({ preventScroll: true }); }, 700);
+  });
+
+  /* ---------- Sidebar tabs + history ---------- */
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
+    el.nav.hidden = t.dataset.tab !== 'menu';
+    el.historyPanel.hidden = t.dataset.tab !== 'history';
+  }));
+
+  function renderHistory() {
+    el.historyList.innerHTML = '';
+    el.historyEmpty.hidden = chats.length > 0;
+    chats.forEach((c) => {
+      const row = document.createElement('div');
+      row.className = 'hist-item' + (current && c.id === current.id ? ' active' : '');
+      const open = document.createElement('button');
+      open.type = 'button'; open.className = 'hist-open'; open.textContent = c.title;
+      open.addEventListener('click', () => loadChat(c.id));
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'hist-del'; del.textContent = '✕';
+      del.setAttribute('aria-label', 'Delete chat');
+      del.addEventListener('click', () => deleteChat(c.id));
+      row.append(open, del);
+      el.historyList.appendChild(row);
+    });
+  }
+
+  function loadChat(id) {
+    const c = chats.find((x) => x.id === id);
+    if (!c) return;
+    if (controller) controller.abort();
+    busy = false; showTyping(false); updateSend();
+    el.messages.innerHTML = '';
+    current = c;
+    c.messages.forEach((m) => addMessage(m.role, m.content, { restore: true }));
+    el.welcome.hidden = true;
+    setStatus('', 'Ready');
+    renderHistory();
+    openSidebar(false);
+  }
+
+  function deleteChat(id) {
+    chats = chats.filter((c) => c.id !== id);
+    saveChats();
+    if (current && current.id === id) newChat(); else renderHistory();
+  }
+
+  /* ---------- Login / logout (frontend only) ---------- */
+  function updateAuthUI() {
+    const name = user ? user.name : 'Guest';
+    el.userName.textContent = name;
+    el.userSub.textContent = user ? user.email : 'Log in to save your name';
+    el.userAvatar.textContent = name.charAt(0).toUpperCase();
+    el.accountName.textContent = name;
+    el.accountSub.textContent = user ? user.email : 'Not logged in';
+    el.loginOpenBtn.hidden = !!user;
+    el.logoutBtn.hidden = !user;
+  }
+
+  function switchUser(u) {
+    user = u;
+    try { if (u) localStorage.setItem('src_user', JSON.stringify(u)); else localStorage.removeItem('src_user'); } catch (_) {}
+    chats = loadChats();
+    newChat();
+    updateAuthUI();
+  }
+
+  function openLogin() {
+    el.modal.hidden = true;
+    el.loginError.textContent = '';
+    el.loginModal.hidden = false;
+    openSidebar(false);
+    el.loginName.focus();
+  }
+  const closeLogin = () => { el.loginModal.hidden = true; };
+
+  function submitLogin() {
+    const name = el.loginName.value.trim();
+    const email = el.loginEmail.value.trim();
+    if (!name) { el.loginError.textContent = 'Enter your name.'; return; }
+    if (!email || !el.loginEmail.checkValidity()) { el.loginError.textContent = 'Enter a valid email address.'; return; }
+    switchUser({ name, email });
+    el.loginName.value = ''; el.loginEmail.value = '';
+    closeLogin();
+  }
+
+  el.userChip.addEventListener('click', () => { if (user) openSettings(); else openLogin(); });
+  el.loginOpenBtn.addEventListener('click', openLogin);
+  el.logoutBtn.addEventListener('click', () => { switchUser(null); el.modal.hidden = true; });
+  el.loginSubmit.addEventListener('click', submitLogin);
+  el.loginCancel.addEventListener('click', closeLogin);
+  el.loginModal.addEventListener('click', (e) => { if (e.target === el.loginModal) closeLogin(); });
+  [el.loginName, el.loginEmail].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitLogin(); }));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.loginModal.hidden) closeLogin(); });
+
   /* ---------- Settings ---------- */
   function openSettings() {
     el.backendUrl.value = backendUrl;
@@ -226,7 +353,7 @@
     closeSettings();
   });
   el.resetUrl.addEventListener('click', () => { el.backendUrl.value = DEFAULT_URL; });
-  el.clearChat.addEventListener('click', () => { newChat(); el.modal.hidden = true; });
+  el.clearChat.addEventListener('click', () => { if (current) deleteChat(current.id); else newChat(); el.modal.hidden = true; });
   el.modal.addEventListener('click', (e) => { if (e.target === el.modal) closeSettings(); });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
@@ -235,4 +362,6 @@
   });
 
   updateSend();
+  renderHistory();
+  updateAuthUI();
 })();
