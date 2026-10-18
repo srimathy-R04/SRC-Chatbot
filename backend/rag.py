@@ -140,9 +140,10 @@ def get_source_bonus(query, source):
 # SEARCH KNOWLEDGE BASE
 # ==================================================
 
+
 def search_knowledge(query, top_k=3):
     query_words = tokenize(query)
-    query_lower = query.lower()
+    query_lower = query.lower().strip()
     results = []
 
     documents = load_documents()
@@ -155,33 +156,33 @@ def search_knowledge(query, top_k=3):
 
         for chunk in chunks:
             chunk_words = tokenize(chunk)
-            chunk_lower = chunk.lower()
+            chunk_lower = chunk.lower().strip()
 
-            # Basic word matching
             score = 0
 
-            for word in query_words:
-                if word in chunk_words:
-                    score += 5
+            # Ignore chunks that simply repeat the complete question.
+            normalized_chunk = re.sub(r"\s+", " ", chunk_lower)
+            normalized_query = re.sub(r"\s+", " ", query_lower)
 
-            # Exact phrase matching
-            if query_lower.strip() in chunk_lower:
-                score += 20
+            if normalized_chunk == normalized_query:
+                continue
 
-            # Extra points for important matching terms
-            important_keywords = {
-                "phone", "number", "email", "fee", "fees",
-                "programme", "programmes", "program", "course",
-                "courses", "cia", "exam", "examination",
-                "admission", "address", "contact", "website",
-                "calendar", "semester", "academic", "year"
-            }
+            # Score meaningful query-word matches.
+            matched_words = set(query_words) & set(chunk_words)
+            score += len(matched_words) * 5
 
-            for keyword in important_keywords:
-                if keyword in query_lower and keyword in chunk_lower:
-                    score += 10
+            # Prefer chunks that contain useful information
+            # beyond the words already present in the question.
+            extra_words = set(chunk_words) - set(query_words) - STOP_WORDS
+            if matched_words and extra_words:
+                score += min(len(extra_words), 5) * 2
 
-            # Prioritize the appropriate knowledge-base file
+            # Give a small bonus for an exact phrase match,
+            # without letting a repeated question dominate.
+            if query_lower in chunk_lower:
+                score += 3
+
+            # Prioritize the appropriate knowledge-base file.
             score += get_source_bonus(query, document["source"])
 
             if score > 0:
@@ -191,11 +192,10 @@ def search_knowledge(query, top_k=3):
                     "score": score
                 })
 
-    # Highest score first
+    # Highest score first.
     results.sort(key=lambda item: item["score"], reverse=True)
 
     return results[:top_k]
-
 
 # ==================================================
 # GET CONTEXT FOR THE CHATBOT

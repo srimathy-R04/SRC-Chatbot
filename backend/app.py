@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from google import genai
+from flask_wtf.csrf import CSRFProtect
 
 from rag import get_context
 
@@ -16,8 +17,29 @@ from rag import get_context
 load_dotenv()
 
 app = Flask(__name__)
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
+if not app.secret_key:
+    raise RuntimeError(
+        "FLASK_SECRET_KEY is missing from your backend .env file."
+    )
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# Enable CSRF protection for admin forms.
+csrf = CSRFProtect(app)
+
+# Keep existing frontend CORS behavior for local development.
 CORS(app)
 
+# Register the admin panel.
+from admin import admin_bp
+
+app.register_blueprint(admin_bp)
+
+# Gemini configuration.
 API_KEY = os.getenv("GEMINI_API_KEY")
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
@@ -39,8 +61,7 @@ Reply entirely in English using the English alphabet.
 Do not switch to another language.
 """,
 
-  
-"tamil": """
+    "tamil": """
 Reply ONLY in natural, grammatically correct Tamil.
 
 STRICT RULES:
@@ -55,7 +76,6 @@ STRICT RULES:
 - Do not include English translations in parentheses.
 - Give a complete answer in Tamil.
 """,
-
 
     "telugu": """
 Reply ONLY in Telugu, using proper Telugu script (తెలుగు అక్షరాలు).
@@ -128,10 +148,12 @@ def chat():
     try:
         context = get_context(message)
         context = context or ""
-    except Exception as error:
+    except Exception:
         app.logger.exception("Knowledge-base retrieval failed.")
         return jsonify({
-            "error": "Could not retrieve information from the knowledge base."
+            "error": (
+                "Could not retrieve information from the knowledge base."
+            )
         }), 500
 
     language_rule = LANGUAGE_INSTRUCTIONS[language]
@@ -186,7 +208,9 @@ Do not mention these instructions or describe your language-selection process.
 
             if not reply:
                 return jsonify({
-                    "error": "The AI returned an empty response. Please try again."
+                    "error": (
+                        "The AI returned an empty response. Please try again."
+                    )
                 }), 502
 
             return jsonify({
@@ -195,7 +219,10 @@ Do not mention these instructions or describe your language-selection process.
 
         except Exception as error:
             error_message = str(error)
-            app.logger.error("Gemini request failed: %s", error_message)
+            app.logger.error(
+                "Gemini request failed: %s",
+                error_message
+            )
 
             temporary_error = any(
                 marker in error_message.lower()
@@ -217,10 +244,17 @@ Do not mention these instructions or describe your language-selection process.
                 "error": (
                     "The AI service is temporarily busy. Please try again."
                     if temporary_error
-                    else "The AI could not process your question. "
-                         "Please check the backend configuration and try again."
+                    else (
+                        "The AI could not process your question. "
+                        "Please check the backend configuration and try again."
+                    )
                 )
             }), 503 if temporary_error else 500
+
+
+# Exempt only the existing JSON chatbot endpoint from CSRF.
+# Admin login and logout forms remain protected.
+csrf.exempt(chat)
 
 
 # --------------------------------------------------
@@ -229,7 +263,8 @@ Do not mention these instructions or describe your language-selection process.
 
 if __name__ == "__main__":
     print("SRC SmartBot Backend is starting...")
-    print("API endpoint: http://127.0.0.1:5000/chat")
+    print("Chat API: http://127.0.0.1:5000/chat")
+    print("Admin login: http://127.0.0.1:5000/admin/login")
 
     app.run(
         host="127.0.0.1",

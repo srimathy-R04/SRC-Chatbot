@@ -152,8 +152,10 @@
     </section>
 
     <footer class="composer">
+      <p class="voice-status" id="voiceStatus" role="status" aria-live="polite" hidden></p>
       <form class="input-wrap" id="chatForm" autocomplete="off">
         <textarea id="userInput" rows="1" maxlength="2000" placeholder="Ask anything about SRC…" aria-label="Message"></textarea>
+        <button class="mic" id="micBtn" type="button" aria-label="Start voice input" aria-pressed="false" title="Voice input"><svg class="ico" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
         <button class="send" id="sendBtn" type="submit" aria-label="Send message" disabled>
           <svg class="ico" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
         </button>

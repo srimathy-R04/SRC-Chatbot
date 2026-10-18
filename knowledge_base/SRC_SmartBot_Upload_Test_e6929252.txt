@@ -1,0 +1,31 @@
+SRC SMARTBOT — ADMIN UPLOAD TEST DOCUMENT
+
+
+
+Purpose:
+
+This is a temporary test document to check the SRC SmartBot admin upload and approval workflow.
+
+
+
+Test Information:
+
+The code word for this upload test is ORCHID-27.
+
+
+
+Test Question:
+
+What is the code word in the admin upload test document?
+
+
+
+Expected Answer:
+
+The code word is ORCHID-27.
+
+
+
+Important:
+
+This is test-only information. ORCHID-27 is NOT an official SRC fact. Do not use this document as official campus information. Remove this test document from the knowledge base after testing.

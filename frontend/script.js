@@ -19,6 +19,7 @@
     logoutBtn: $('logoutBtn'), loginModal: $('loginModal'), loginName: $('loginName'),
     loginEmail: $('loginEmail'), loginSubmit: $('loginSubmit'), loginCancel: $('loginCancel'),
     loginError: $('loginError'),
+    mic: $('micBtn'), voiceStatus: $('voiceStatus'),
   };
 
   let backendUrl = DEFAULT_URL;
@@ -111,10 +112,14 @@
       bubble.appendChild(btn);
     }
 
+    const meta = document.createElement('div');
+    meta.className = 'meta';
     const t = document.createElement('span');
     t.className = 'time';
     t.textContent = now();
-    col.appendChild(t);
+    meta.appendChild(t);
+    if (role === 'bot' && !opts.error) meta.appendChild(makeSpeakBtn(bubble));
+    col.appendChild(meta);
 
     row.appendChild(col);
     el.messages.appendChild(row);
@@ -130,6 +135,7 @@
   async function sendMessage(text, { silentUser = false } = {}) {
     text = text.trim();
     if (!text || busy) return;
+    if (rec) abortListening();
 
     if (!silentUser) addMessage('user', text);
     el.input.value = '';
@@ -180,6 +186,7 @@
   }
 
   function newChat() {
+    stopVoice();
     if (controller) controller.abort();
     busy = false;
     current = null;
@@ -238,6 +245,209 @@
     }
   });
 
+  /* ---------- Voice input + output (browser Web Speech API only; no audio leaves the browser via this app) ---------- */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const synth = ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) ? window.speechSynthesis : null;
+  const LOCALES = { Auto: 'en-IN', English: 'en-IN', Tamil: 'ta-IN', Telugu: 'te-IN', Tanglish: 'ta-IN' };
+  const LANG_NAMES = { en: 'English', ta: 'Tamil', te: 'Telugu' };
+  const SPEAK_ICON = '<svg class="ico s-play" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>' +
+                     '<svg class="ico s-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+  let rec = null, listening = false, restartAfter = false, heard = false, recError = false;
+  let statusTimer = null, voices = [], session = null;
+
+  const langName = (loc) => LANG_NAMES[String(loc).slice(0, 2)] || loc;
+  const recLocale = () => LOCALES[el.lang.value] || 'en-IN';
+
+  function say(msg, kind = 'info', ms = 5000) {   // textContent only: never inserts HTML
+    clearTimeout(statusTimer);
+    el.voiceStatus.textContent = msg;
+    el.voiceStatus.className = 'voice-status ' + kind;
+    el.voiceStatus.hidden = false;
+    if (ms) statusTimer = setTimeout(() => { el.voiceStatus.hidden = true; }, ms);
+  }
+  function hideSay() { clearTimeout(statusTimer); el.voiceStatus.hidden = true; }
+
+  function micUI(on) {
+    el.mic.classList.toggle('listening', on);
+    el.mic.setAttribute('aria-pressed', String(on));
+    el.mic.setAttribute('aria-label', on ? 'Stop voice input' : 'Start voice input');
+    el.mic.title = on ? 'Stop listening' : `Voice input (${langName(recLocale())})`;
+  }
+
+  /* ----- speech recognition ----- */
+  function detach() {
+    if (rec) { rec.onstart = rec.onresult = rec.onerror = rec.onend = null; }
+    rec = null; listening = false;
+    micUI(false);
+  }
+
+  function abortListening() {
+    restartAfter = false; recError = false;
+    if (rec) { const r = rec; detach(); try { r.abort(); } catch (_) {} }
+  }
+
+  function finishListening(r) {
+    if (rec !== r) return;
+    const lang = r.lang;
+    detach();
+    if (restartAfter) { restartAfter = false; setTimeout(startListening, 150); return; }
+    if (recError) { recError = false; return; }      // keep the error message that is showing
+    if (heard) {
+      say(lang === 'en-IN'
+        ? 'Review the text, then press Send.'
+        : `Review the text before sending. Mixed ${langName(lang)}–English speech may not be recognised perfectly.`, 'info', 7000);
+      el.input.focus({ preventScroll: true });
+    } else {
+      say("I didn't catch anything. Click the mic and try again.", 'info');
+    }
+  }
+
+  function startListening() {
+    if (!SR) { say("Voice input isn't supported in this browser. Please use Chrome or Edge, or type your question.", 'err', 7000); return; }
+    if (rec) return;                                  // never run two sessions at once
+    stopSpeaking();
+    const r = new SR();
+    const locale = recLocale();
+    const prefix = el.input.value.trim() ? el.input.value.trim() + ' ' : '';
+    rec = r; heard = false; recError = false;
+    r.lang = locale; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+    r.onstart = () => { listening = true; micUI(true); say(`Listening in ${langName(locale)}… speak now. Click the mic to stop.`, 'live', 0); };
+    r.onresult = (e) => {
+      let text = '';
+      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      heard = text.trim().length > 0;
+      el.input.value = prefix + text.trim();          // fill only; the user sends it
+      autoGrow(); updateSend();
+    };
+    r.onerror = (e) => {
+      recError = true;
+      const msgs = {
+        'not-allowed': 'Microphone access is blocked. Allow the microphone in your browser’s site settings, then try again.',
+        'service-not-allowed': 'Microphone access is blocked. Allow the microphone in your browser’s site settings, then try again.',
+        'no-speech': "I didn't hear anything. Click the mic and try again.",
+        'audio-capture': 'No microphone was found. Check that one is connected.',
+        'network': 'Speech recognition needs an internet connection in this browser.',
+        'language-not-supported': `This browser can't recognise ${langName(locale)} speech. Try English or type your question.`,
+      };
+      if (e.error === 'aborted') { hideSay(); return; }
+      let m = msgs[e.error] || 'Voice input ran into a problem. Please try again or type your question.';
+      if (locale !== 'en-IN' && (e.error === 'no-speech' || !msgs[e.error])) m += ` Mixed ${langName(locale)}–English speech may not be recognised perfectly.`;
+      say(m, 'err', 8000);
+    };
+    r.onend = () => finishListening(r);
+    try { r.start(); } catch (_) { detach(); say('Could not start the microphone. Please try again.', 'err'); }
+  }
+
+  function stopListening() {
+    if (!rec) return;
+    const r = rec;
+    try { r.stop(); } catch (_) {}
+    setTimeout(() => finishListening(r), 1500);       // fallback if the browser never fires onend
+  }
+
+  el.mic.addEventListener('click', () => { if (rec) stopListening(); else startListening(); });
+  el.lang.addEventListener('change', () => {
+    if (rec && listening) { restartAfter = true; stopListening(); }
+    else if (rec) { abortListening(); startListening(); }
+    else micUI(false);
+  });
+
+  /* ----- speech synthesis ----- */
+  function loadVoices() { try { voices = synth.getVoices() || []; } catch (_) { voices = []; } }
+  if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
+
+  const normLang = (v) => v.lang.replace('_', '-').toLowerCase();
+
+  function targetLang(text) {
+    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta-IN';
+    if (/[\u0C00-\u0C7F]/.test(text)) return 'te-IN';
+    return el.lang.value === 'Tanglish' ? 'ta-IN' : 'en-IN';
+  }
+
+  function pickVoice(lang, text) {
+    const want = lang.toLowerCase(), prim = want.slice(0, 2);
+    let v = voices.find((x) => normLang(x) === want) || voices.find((x) => normLang(x).startsWith(prim));
+    if (v) return { voice: v, lang: v.lang, exact: normLang(v) === want };
+    if (prim === 'ta' && !/[\u0B80-\u0BFF]/.test(text)) {      // romanised (Tanglish) text can use English
+      v = voices.find((x) => normLang(x) === 'en-in') || voices.find((x) => normLang(x).startsWith('en'));
+      if (v) return { voice: v, lang: v.lang, exact: false };
+    }
+    return { voice: null, lang, exact: false };
+  }
+
+  function speakUI(btn, on) {
+    btn.classList.toggle('speaking', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', on ? 'Stop speaking' : 'Read response aloud');
+    btn.title = on ? 'Stop speaking' : 'Read response aloud';
+  }
+
+  function endSpeaking(s) {
+    if (session !== s) return;
+    session = null; speakUI(s.btn, false); hideSay();
+  }
+
+  function stopSpeaking() {
+    if (session) { const s = session; session = null; speakUI(s.btn, false); hideSay(); }
+    if (synth) { try { synth.cancel(); } catch (_) {} }
+  }
+
+  function stopVoice() { abortListening(); stopSpeaking(); hideSay(); }
+
+  function toggleSpeak(btn, bubble) {
+    if (!synth) { say("Voice output isn't supported in this browser. Try Chrome, Edge or Safari.", 'err', 7000); return; }
+    if (session && session.btn === btn) { stopSpeaking(); return; }   // second click stops
+    stopSpeaking();
+    abortListening();
+    const raw = (bubble.innerText || bubble.textContent || '');       // the text actually displayed
+    const text = raw.replace(/([^.!?।:;,\s])[ \t]*\n+\s*/g, '$1. ').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    loadVoices();
+    const lang = targetLang(text);
+    const pick = pickVoice(lang, text);
+    const parts = [];
+    let cur = '';
+    for (const c of (text.match(/[^.!?।]+[.!?।]*\s*/g) || [text])) {  // short chunks avoid browsers cutting long speech
+      if (cur && (cur + c).length > 220) { parts.push(cur.trim()); cur = c; } else cur += c;
+    }
+    if (cur.trim()) parts.push(cur.trim());
+
+    const s = { btn };
+    session = s;
+    speakUI(btn, true);
+    let note = 'Speaking… click the speaker again to stop.';
+    if (voices.length && !pick.exact) {
+      note = pick.voice
+        ? `Speaking… no ${langName(lang)} voice is installed, so ${pick.voice.name} is being used instead.`
+        : `Speaking with the browser’s default voice. No ${langName(lang)} voice was found on this device.`;
+    }
+    say(note, 'live', 0);
+    let left = parts.length;
+    parts.forEach((p) => {
+      const u = new SpeechSynthesisUtterance(p);
+      u.lang = pick.lang;
+      if (pick.voice) u.voice = pick.voice;
+      u.onend = () => { if (session === s && --left === 0) endSpeaking(s); };
+      u.onerror = (e) => {
+        if (session !== s) return;                    // ignore events from a cancelled utterance
+        endSpeaking(s);
+        if (e.error && e.error !== 'interrupted' && e.error !== 'canceled') say("Sorry, I couldn't read that aloud on this device.", 'err');
+      };
+      synth.speak(u);
+    });
+  }
+
+  function makeSpeakBtn(bubble) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'speak' + (synth ? '' : ' unsupported');
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = SPEAK_ICON;                         // fixed, trusted SVG
+    speakUI(b, false);
+    b.addEventListener('click', () => toggleSpeak(b, bubble));
+    return b;
+  }
+
   /* ---------- Landing ---------- */
   el.enter.addEventListener('click', () => {
     el.landing.classList.add('leave');
@@ -273,6 +483,7 @@
   function loadChat(id) {
     const c = chats.find((x) => x.id === id);
     if (!c) return;
+    stopVoice();
     if (controller) controller.abort();
     busy = false; showTyping(false); updateSend();
     el.messages.innerHTML = '';
@@ -364,4 +575,7 @@
   updateSend();
   renderHistory();
   updateAuthUI();
+  micUI(false);
+  if (!SR) { el.mic.classList.add('unsupported'); el.mic.title = 'Voice input is not supported in this browser'; }
+  window.addEventListener('pagehide', stopVoice);
 })();

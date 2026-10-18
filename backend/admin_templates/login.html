@@ -1,0 +1,66 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SRC SmartBot Admin Login</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #0b1020;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .login-card {
+            width: min(360px, 85%);
+            padding: 30px;
+            border-radius: 16px;
+            background: #171d32;
+        }
+        h1 { color: #a78bfa; }
+        input, button {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+        }
+        input {
+            border: 1px solid #444c68;
+            background: #0b1020;
+            color: white;
+        }
+        button {
+            border: 0;
+            background: #7c3aed;
+            color: white;
+            cursor: pointer;
+        }
+        .error { color: #fca5a5; }
+    </style>
+</head>
+<body>
+    <main class="login-card">
+        <h1>SRC SmartBot</h1>
+        <p>Administrator Login</p>
+
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <p class="error">{{ message }}</p>
+        {% endfor %}
+
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input name="username" placeholder="Admin username"
+                   autocomplete="username" required>
+            <input type="password" name="password"
+                   placeholder="Admin password"
+                   autocomplete="current-password" required>
+            <button type="submit">Sign In</button>
+        </form>
+    </main>
+</body>
+</html>

@@ -1,0 +1,655 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SRC SmartBot | Admin Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #0b1020;
+            color: #f1f5f9;
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            flex-shrink: 0;
+            padding: 28px 18px;
+            background: #11172a;
+            border-right: 1px solid #252d43;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand {
+            padding: 0 12px 28px;
+            border-bottom: 1px solid #252d43;
+        }
+
+        .brand h2 {
+            margin: 0 0 8px;
+            font-size: 23px;
+            color: #c4b5fd;
+        }
+
+        .brand p {
+            margin: 0;
+            color: #94a3b8;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        .nav-label {
+            margin: 28px 12px 12px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 13px 14px;
+            margin: 4px 0;
+            color: #cbd5e1;
+            text-decoration: none;
+            border-radius: 9px;
+            font-size: 14px;
+        }
+
+        .nav-item.active {
+            background: #312e81;
+            color: #ddd6fe;
+            border: 1px solid #4c449e;
+        }
+
+        .nav-item:hover {
+            background: #202943;
+        }
+
+        .sidebar-bottom {
+            margin-top: auto;
+            padding-top: 24px;
+        }
+
+        .main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .topbar {
+            min-height: 80px;
+            padding: 20px 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            border-bottom: 1px solid #252d43;
+            background: #0f1527;
+        }
+
+        .topbar h1 {
+            margin: 0;
+            font-size: 23px;
+        }
+
+        .topbar p {
+            margin: 6px 0 0;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        .admin-badge {
+            padding: 9px 13px;
+            border: 1px solid #4c449e;
+            background: #211d49;
+            border-radius: 20px;
+            color: #ddd6fe;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .content {
+            max-width: 1250px;
+            margin: 0 auto;
+            padding: 36px;
+        }
+
+        .welcome h2 {
+            margin: 0 0 10px;
+            font-size: 28px;
+        }
+
+        .welcome p {
+            color: #94a3b8;
+            line-height: 1.7;
+            margin: 0;
+        }
+
+        .section-title {
+            margin: 34px 0 16px;
+            font-size: 18px;
+        }
+
+        .card {
+            padding: 24px;
+            border: 1px solid #29334d;
+            border-radius: 15px;
+            background: linear-gradient(145deg, #171f36, #11172a);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+
+        .card p {
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .file-label {
+            display: block;
+            margin: 15px 0 10px;
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+
+        .file-input {
+            display: block;
+            width: 100%;
+            margin: 12px 0;
+            padding: 13px;
+            color: #e2e8f0;
+            background: #0b1020;
+            border: 1px solid #29334d;
+            border-radius: 8px;
+        }
+
+        .helper-text {
+            margin: 10px 0 18px;
+            color: #94a3b8;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .upload-button,
+        .reject-button {
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .upload-button {
+            border: 1px solid #7c3aed;
+            background: #7c3aed;
+            color: white;
+        }
+
+        .upload-button:hover {
+            background: #6d28d9;
+        }
+
+        .reject-button {
+            border: 1px solid #7f1d1d;
+            background: #3f1d2a;
+            color: #fecaca;
+        }
+
+        .reject-button:hover {
+            background: #572033;
+        }
+
+        .small-button {
+            padding: 8px 11px;
+            white-space: nowrap;
+        }
+
+        .table-card {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .documents-table th {
+            padding: 15px 14px;
+            color: #c4b5fd;
+            background: #121a2d;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .documents-table td {
+            padding: 15px 14px;
+            border-top: 1px solid #29334d;
+            vertical-align: middle;
+        }
+
+        .documents-table tbody tr:hover {
+            background: #19223a;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+        }
+
+        .status-pending {
+            background: #3b2e18;
+            color: #fcd34d;
+        }
+
+        .status-approved {
+            background: #173a32;
+            color: #86efac;
+        }
+
+        .status-rejected {
+            background: #3f1d2a;
+            color: #fecaca;
+        }
+
+        .muted {
+            color: #94a3b8;
+        }
+
+        .empty-state {
+            padding: 38px 20px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            margin-bottom: 12px;
+            color: #a78bfa;
+            font-size: 32px;
+        }
+
+        .empty-state h3 {
+            margin: 0 0 8px;
+        }
+
+        .empty-state p {
+            margin: 0;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+
+        .notice {
+            margin-top: 26px;
+            padding: 20px;
+            border: 1px solid #37305f;
+            border-radius: 12px;
+            background: #17152f;
+        }
+
+        .notice h3 {
+            margin: 0 0 8px;
+            color: #c4b5fd;
+            font-size: 15px;
+        }
+
+        .notice p {
+            margin: 0;
+            color: #cbd5e1;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .flash-message {
+            margin-top: 18px;
+            padding: 14px 18px;
+            border: 1px solid #37305f;
+            border-radius: 10px;
+        }
+
+        .flash-message p {
+            margin: 0;
+            font-size: 13px;
+        }
+
+        .flash-message.success {
+            background: #132d28;
+            border-color: #285b49;
+        }
+
+        .flash-message.error {
+            background: #301b2c;
+            border-color: #7f1d1d;
+        }
+
+        .footer {
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 1px solid #252d43;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .logout-button {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #58324b;
+            border-radius: 9px;
+            background: #301b2c;
+            color: #fecdd3;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .logout-button:hover {
+            background: #482137;
+        }
+
+        @media (max-width: 850px) {
+            .sidebar {
+                width: 210px;
+            }
+
+            .content {
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                padding: 18px;
+            }
+
+            .brand {
+                padding-bottom: 16px;
+            }
+
+            .nav-label {
+                margin-top: 16px;
+            }
+
+            .sidebar-bottom {
+                margin-top: 15px;
+                padding-top: 12px;
+            }
+
+            .topbar {
+                padding: 18px;
+            }
+
+            .topbar h1 {
+                font-size: 19px;
+            }
+
+            .admin-badge {
+                font-size: 10px;
+            }
+
+            .content {
+                padding: 22px 18px;
+            }
+
+            .welcome h2 {
+                font-size: 23px;
+            }
+
+            .documents-table th,
+            .documents-table td {
+                padding: 10px 8px;
+            }
+
+            .action-buttons {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="layout">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <h2>SRC SmartBot</h2>
+            <p>ADMINISTRATION PANEL</p>
+        </div>
+
+        <div class="nav-label">WORKSPACE</div>
+
+        <a class="nav-item active" href="{{ url_for('admin.dashboard') }}">
+            ◈ Dashboard
+        </a>
+
+        <div class="nav-label">KNOWLEDGE MANAGEMENT</div>
+
+        <div class="nav-item">▤ SRC Information</div>
+        <div class="nav-item">▤ Academic Calendar</div>
+        <div class="nav-item">▤ Programmes &amp; Admissions</div>
+        <div class="nav-item">▤ Contacts &amp; Facilities</div>
+
+        <div class="sidebar-bottom">
+            <form method="POST" action="{{ url_for('admin.logout') }}">
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token() }}"
+                >
+                <button class="logout-button" type="submit">
+                    ↪ Log Out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1>Admin Dashboard</h1>
+                <p>Manage the knowledge behind SRC SmartBot</p>
+            </div>
+            <span class="admin-badge">● Administrator</span>
+        </header>
+
+        <div class="content">
+
+            <section class="welcome">
+                <h2>Welcome back!</h2>
+                <p>
+                    Manage SRC information used by your chatbot.
+                    Upload documents, review them, and approve verified information.
+                </p>
+            </section>
+
+            {% for category, message in get_flashed_messages(with_categories=true) %}
+                <div class="flash-message {{ category }}">
+                    <p>{{ message }}</p>
+                </div>
+            {% endfor %}
+
+            <h2 class="section-title">Upload a Document</h2>
+
+            <section class="card">
+                <form
+                    method="POST"
+                    action="{{ url_for('admin.upload_document') }}"
+                    enctype="multipart/form-data"
+                >
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    >
+
+                    <label class="file-label" for="document">
+                        Select an SRC knowledge-base text file (.txt)
+                    </label>
+
+                    <input
+                        id="document"
+                        class="file-input"
+                        type="file"
+                        name="document"
+                        accept=".txt,text/plain"
+                        required
+                    >
+
+                    <p class="helper-text">
+                        Maximum file size: 1 MB. Documents remain pending
+                        until an administrator approves them.
+                    </p>
+
+                    <button type="submit" class="upload-button">
+                        ↑ Upload for Review
+                    </button>
+                </form>
+            </section>
+
+            <h2 class="section-title">Document Management</h2>
+
+            <section class="card table-card">
+                {% if documents %}
+                    <div class="table-wrap">
+                        <table class="documents-table">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Status</th>
+                                    <th>Uploaded</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for document in documents %}
+                                    <tr>
+                                        <td>
+                                            {{ document["original_name"] }}
+                                        </td>
+
+                                        <td>
+                                            <span class="status status-{{ document['status'] }}">
+                                                {{ document["status"]|capitalize }}
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            {{ document["uploaded_at"] }}
+                                        </td>
+
+                                        <td>
+                                            {% if document["status"] == "pending" %}
+                                                <div class="action-buttons">
+                                                    <form
+                                                        method="POST"
+                                                        action="{{ url_for('admin.approve_document', document_id=document['id']) }}"
+                                                    >
+                                                        <input
+                                                            type="hidden"
+                                                            name="csrf_token"
+                                                            value="{{ csrf_token() }}"
+                                                        >
+                                                        <button
+                                                            type="submit"
+                                                            class="upload-button small-button"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                    </form>
+
+                                                    <form
+                                                        method="POST"
+                                                        action="{{ url_for('admin.reject_document', document_id=document['id']) }}"
+                                                    >
+                                                        <input
+                                                            type="hidden"
+                                                            name="csrf_token"
+                                                            value="{{ csrf_token() }}"
+                                                        >
+                                                        <button
+                                                            type="submit"
+                                                            class="reject-button small-button"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            {% else %}
+                                                <span class="muted">
+                                                    {{ document["status"]|capitalize }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">▤</div>
+                        <h3>No documents uploaded yet</h3>
+                        <p>
+                            Upload a verified SRC text document to begin
+                            the review process.
+                        </p>
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="notice">
+                <h3>Important Security Reminder</h3>
+                <p>
+                    Upload only verified, non-confidential SRC information.
+                    Do not upload student records, hall-ticket numbers,
+                    passwords, or other private information to the general
+                    chatbot knowledge base.
+                </p>
+            </section>
+
+            <div class="footer">
+                SRC SmartBot · Administrator Workspace
+            </div>
+
+        </div>
+    </main>
+
+</div>
+</body>
+</html>
